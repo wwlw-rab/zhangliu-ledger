@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zhangliu-shell-v2';
+﻿const CACHE_NAME = 'zhangliu-shell-v3';
 const BASE_URL = new URL('./', self.location.href).pathname;
 const APP_SHELL = [
   BASE_URL,
@@ -22,11 +22,21 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      }).catch(() => caches.match(event.request).then((cached) => cached || caches.match(BASE_URL))),
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
       const copy = response.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
       return response;
-    }).catch(() => caches.match(BASE_URL))),
+    })),
   );
 });
