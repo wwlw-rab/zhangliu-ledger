@@ -1,0 +1,16 @@
+{
+  "name": "账流 · 个人资金看板",
+  "short_name": "账流",
+  "description": "自动聚合微信与支付宝账单的个人记账工具",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0e13",
+  "theme_color": "#0a0e13",
+  "orientation": "portrait",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
