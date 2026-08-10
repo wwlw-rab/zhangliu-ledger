@@ -1,41 +1,31 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  Bell,
-  ChevronDown,
-  ChevronRight,
-  CircleAlert,
-  Cloud,
-  FileUp,
-  Filter,
-  Home,
-  Inbox,
-  LayoutGrid,
-  ListFilter,
-  Mail,
-  MoreHorizontal,
-  Plus,
-  RefreshCw,
-  Search,
-  Settings,
-  ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
-  Tags,
-  WalletCards,
-  X,
+  ArrowDownLeft, ArrowUpRight, Bell, ChevronDown, ChevronRight, CircleAlert,
+  Cloud, FileUp, Filter, Home, Inbox, ListFilter, Mail, MoreHorizontal,
+  Plus, RefreshCw, Search, Settings, ShieldCheck, SlidersHorizontal,
+  Sparkles, Tags, WalletCards, X,
 } from 'lucide-react';
 import './styles.css';
 
-const transactions = [
-  { id: 'tx-1', merchant: '山姆会员商店', category: '购物', source: 'alipay', amount: 368.00, net: 368.00, time: '今天 12:42', date: '2026-08-06', status: '已入账', accent: 'orange', note: '家庭补给' },
-  { id: 'tx-2', merchant: '滴滴出行', category: '交通', source: 'wechat', amount: 42.50, net: 42.50, time: '今天 09:18', date: '2026-08-06', status: '已入账', accent: 'green', note: '通勤' },
-  { id: 'tx-3', merchant: '网易云音乐', category: '娱乐', source: 'alipay', amount: 15.00, net: 0, time: '昨天 20:11', date: '2026-08-05', status: '已退款', accent: 'red', note: '会员自动续费' },
-  { id: 'tx-4', merchant: '盒马鲜生', category: '餐饮', source: 'wechat', amount: 126.80, net: 86.80, time: '昨天 18:36', date: '2026-08-05', status: '部分退款', accent: 'yellow', note: '缺货退款 ¥40.00' },
-  { id: 'tx-5', merchant: 'Apple.com/bill', category: '订阅', source: 'alipay', amount: 68.00, net: 68.00, time: '08月04日 08:00', date: '2026-08-04', status: '已入账', accent: 'blue', note: '云存储' },
-  { id: 'tx-6', merchant: '瑞幸咖啡', category: '餐饮', source: 'wechat', amount: 19.90, net: 19.90, time: '08月03日 10:23', date: '2026-08-03', status: '已入账', accent: 'brown', note: '生椰拿铁' },
+const STORAGE_KEY = 'zhangliu.transactions.v2';
+const RULES_KEY = 'zhangliu.rules.v1';
+const SYNC_KEY = 'zhangliu.lastSync';
+
+const seedTransactions = [
+  { id: 'tx-1', merchant: '山姆会员商店', category: '购物', source: 'alipay', amount: 368, refundAmount: 0, net: 368, time: '今天 12:42', date: '2026-08-06', status: '已入账', accent: 'orange', note: '家庭补给', transactionId: 'demo-alipay-1' },
+  { id: 'tx-2', merchant: '滴滴出行', category: '交通', source: 'wechat', amount: 42.5, refundAmount: 0, net: 42.5, time: '今天 09:18', date: '2026-08-06', status: '已入账', accent: 'green', note: '通勤', transactionId: 'demo-wechat-1' },
+  { id: 'tx-3', merchant: '网易云音乐', category: '娱乐', source: 'alipay', amount: 15, refundAmount: 15, net: 0, time: '昨天 20:11', date: '2026-08-05', status: '已退款', accent: 'red', note: '会员自动续费', transactionId: 'demo-alipay-2' },
+  { id: 'tx-4', merchant: '盒马鲜生', category: '餐饮', source: 'wechat', amount: 126.8, refundAmount: 40, net: 86.8, time: '昨天 18:36', date: '2026-08-05', status: '部分退款', accent: 'yellow', note: '缺货退款 ¥40.00', transactionId: 'demo-wechat-2' },
+  { id: 'tx-5', merchant: 'Apple.com/bill', category: '订阅', source: 'alipay', amount: 68, refundAmount: 0, net: 68, time: '08月04日 08:00', date: '2026-08-04', status: '已入账', accent: 'blue', note: '云存储', transactionId: 'demo-alipay-3' },
+  { id: 'tx-6', merchant: '瑞幸咖啡', category: '餐饮', source: 'wechat', amount: 19.9, refundAmount: 0, net: 19.9, time: '08月03日 10:23', date: '2026-08-03', status: '已入账', accent: 'brown', note: '生椰拿铁', transactionId: 'demo-wechat-3' },
+];
+
+const defaultRules = [
+  { id: 'rule-1', keyword: '山姆会员', category: '购物', enabled: true },
+  { id: 'rule-2', keyword: '滴滴', category: '交通', enabled: true },
+  { id: 'rule-3', keyword: '瑞幸', category: '餐饮', enabled: true },
+  { id: 'rule-4', keyword: 'Apple.com', category: '订阅', enabled: true },
 ];
 
 const navItems = [
@@ -45,244 +35,103 @@ const navItems = [
   { id: 'rules', label: '规则', icon: Tags },
   { id: 'settings', label: '设置', icon: Settings },
 ];
-
 const sourceLabel = { alipay: '支付宝', wechat: '微信' };
+const categories = ['餐饮', '购物', '交通', '娱乐', '订阅', '住房', '医疗', '其他'];
 
 function formatMoney(value) {
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function parseMoney(value) {
+  if (value === null || value === undefined) return 0;
+  const normalized = String(value).replace(/[￥¥,\s]/g, '').replace(/\(([^)]+)\)/, '-$1');
+  const match = normalized.match(/-?\d+(?:\.\d+)?/);
+  return match ? Math.abs(Number(match[0])) : 0;
+}
+function clean(value) { return String(value ?? '').replace(/^\uFEFF/, '').trim(); }
+function findField(row, names) {
+  const keys = Object.keys(row);
+  const key = keys.find((item) => names.some((name) => item === name || item.includes(name)));
+  return key ? clean(row[key]) : '';
+}
+function parseCsv(text) {
+  const delimiter = text.split(/\r?\n/)[0]?.includes('\t') ? '\t' : ',';
+  const rows = [];
+  let row = [], cell = '', quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') { cell += '"'; index += 1; continue; }
+    if (char === '"') { quoted = !quoted; continue; }
+    if (char === delimiter && !quoted) { row.push(cell); cell = ''; continue; }
+    if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && next === '\n') index += 1;
+      row.push(cell); cell = '';
+      if (row.some((value) => clean(value))) rows.push(row);
+      row = [];
+      continue;
+    }
+    cell += char;
+  }
+  row.push(cell);
+  if (row.some((value) => clean(value))) rows.push(row);
+  if (rows.length < 2) return [];
+  const headerIndex = rows.findIndex((candidate) => candidate.some((cell) => /交易时间|支付时间|交易对方|金额|收[/]支|交易状态/.test(clean(cell))));
+  const actualHeaderIndex = headerIndex >= 0 ? headerIndex : 0;
+  const headers = rows[actualHeaderIndex].map((header, index) => clean(header) || `字段${index + 1}`);
+  return rows.slice(actualHeaderIndex + 1).map((values) => headers.reduce((result, header, index) => ({ ...result, [header]: clean(values[index]) }), {}));
+}
+function inferSource(fileName, rows) { return /微信|wechat/i.test(`${fileName} ${Object.keys(rows[0] || {}).join(' ')}`) ? 'wechat' : 'alipay'; }
+function parseDate(raw) {
+  const value = clean(raw).replace(/[年月]/g, '-').replace(/日/g, '').replace(/\//g, '-');
+  const match = value.match(/(20\d{2})[-.](\d{1,2})[-.](\d{1,2})/);
+  return match ? `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}` : new Date().toISOString().slice(0, 10);
+}
+function timeLabel(date, raw) { return `${date} ${clean(raw).match(/(\d{1,2}:\d{2}(?::\d{2})?)/)?.[1] || '00:00'}`; }
+function isRefundRow(row) { const value = Object.values(row).join(' '); return /退款|退回|已关闭/.test(value) && !/不退款/.test(value); }
+function isExpenseRow(row) { const direction = findField(row, ['收/支', '收支', '交易类型', '资金流向']); if (/收入|转入|退款/.test(direction) && !/支出/.test(direction)) return false; const status = findField(row, ['交易状态', '状态']); return !/关闭|失败|撤销/.test(status) || /退款/.test(status); }
+function merchantFrom(row) { return findField(row, ['交易对方', '对方', '商户名称', '商家', '商品说明', '商品名称']) || '未命名商户'; }
+function transactionIdFrom(row) { return findField(row, ['交易订单号', '商家订单号', '交易单号', '订单号', '流水号']); }
+function normalizeRows(rows, source, rules) {
+  const payments = [], refunds = [];
+  rows.forEach((row, index) => { const merchant = merchantFrom(row); const amount = parseMoney(findField(row, ['金额', '交易金额', '支付金额', '订单金额'])); if (!amount) return; const date = parseDate(findField(row, ['交易时间', '支付时间', '发生时间', '创建时间', '日期'])); const id = transactionIdFrom(row); const item = { row, merchant, amount, date, id, index }; if (isRefundRow(row)) refunds.push(item); else if (isExpenseRow(row)) payments.push(item); });
+  const refundById = new Map(); refunds.forEach((refund) => { if (refund.id) refundById.set(`${source}:${refund.id}`, (refundById.get(`${source}:${refund.id}`) || 0) + refund.amount); });
+  const usedRefunds = new Set();
+  const records = payments.map((payment, index) => { let refundAmount = payment.id ? (refundById.get(`${source}:${payment.id}`) || 0) : 0; if (!refundAmount) refunds.forEach((refund, refundIndex) => { const sameMerchant = refund.merchant === payment.merchant || refund.merchant.includes(payment.merchant) || payment.merchant.includes(refund.merchant); const sameWindow = Math.abs(new Date(refund.date) - new Date(payment.date)) <= 1000 * 60 * 60 * 24 * 90; if (!usedRefunds.has(refundIndex) && sameMerchant && sameWindow && refund.amount <= payment.amount + 0.01) { refundAmount += refund.amount; usedRefunds.add(refundIndex); } }); refundAmount = Math.min(payment.amount, refundAmount); const categoryRule = rules.find((rule) => rule.enabled && payment.merchant.toLowerCase().includes(rule.keyword.toLowerCase())); const rawCategory = categoryRule?.category || findField(payment.row, ['分类', '交易分类']) || '其他'; const note = findField(payment.row, ['备注', '商品说明', '商品名称']); const status = refundAmount >= payment.amount ? '已退款' : refundAmount > 0 ? '部分退款' : '已入账'; return { id: `${source}-${payment.id || `${payment.date}-${payment.merchant}-${payment.amount}-${index}`}`, transactionId: payment.id, merchant: payment.merchant, category: categories.includes(rawCategory) ? rawCategory : '其他', source, amount: payment.amount, refundAmount, net: Math.max(0, Number((payment.amount - refundAmount).toFixed(2))), date: payment.date, time: timeLabel(payment.date, findField(payment.row, ['交易时间', '支付时间', '发生时间', '创建时间'])), status, accent: ['orange', 'green', 'blue', 'yellow', 'brown', 'red'][index % 6], note }; });
+  return { records, refundCount: refunds.length, source };
+}
+function loadStored(key, fallback) { try { const value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; } catch { return fallback; } }
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedTx, setSelectedTx] = useState(null);
-  const [sourceFilter, setSourceFilter] = useState('全部来源');
-  const [query, setQuery] = useState('');
-  const [showImport, setShowImport] = useState(false);
-  const [syncEnabled, setSyncEnabled] = useState(true);
-  const [notificationEnabled, setNotificationEnabled] = useState(true);
-
-  const filteredTransactions = useMemo(() => transactions.filter((tx) => {
-    const matchesSource = sourceFilter === '全部来源' || sourceLabel[tx.source] === sourceFilter;
-    const matchesQuery = !query || `${tx.merchant}${tx.category}${tx.note}`.toLowerCase().includes(query.toLowerCase());
-    return matchesSource && matchesQuery;
-  }), [query, sourceFilter]);
-
+  const [activeTab, setActiveTab] = useState('dashboard'); const [selectedTx, setSelectedTx] = useState(null); const [sourceFilter, setSourceFilter] = useState('全部来源'); const [query, setQuery] = useState(''); const [showImport, setShowImport] = useState(false); const [syncEnabled, setSyncEnabled] = useState(() => loadStored('zhangliu.syncEnabled', true)); const [notificationEnabled, setNotificationEnabled] = useState(() => loadStored('zhangliu.notificationEnabled', false)); const [transactions, setTransactions] = useState(() => loadStored(STORAGE_KEY, seedTransactions)); const [rules, setRules] = useState(() => loadStored(RULES_KEY, defaultRules)); const [lastSync, setLastSync] = useState(() => loadStored(SYNC_KEY, '尚未导入本地账单'));
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); }, [transactions]); useEffect(() => { localStorage.setItem(RULES_KEY, JSON.stringify(rules)); }, [rules]); useEffect(() => { localStorage.setItem('zhangliu.syncEnabled', JSON.stringify(syncEnabled)); }, [syncEnabled]); useEffect(() => { localStorage.setItem('zhangliu.notificationEnabled', JSON.stringify(notificationEnabled)); }, [notificationEnabled]);
+  const filteredTransactions = useMemo(() => transactions.filter((tx) => { const matchesSource = sourceFilter === '全部来源' || sourceLabel[tx.source] === sourceFilter; const matchesQuery = !query || `${tx.merchant}${tx.category}${tx.note || ''}`.toLowerCase().includes(query.toLowerCase()); return matchesSource && matchesQuery; }), [transactions, query, sourceFilter]);
+  const totals = useMemo(() => ({ net: transactions.reduce((sum, tx) => sum + tx.net, 0), gross: transactions.reduce((sum, tx) => sum + tx.amount, 0), refunded: transactions.reduce((sum, tx) => sum + tx.refundAmount, 0), refundCount: transactions.filter((tx) => tx.refundAmount > 0).length }), [transactions]);
+  const updateSync = () => { const value = new Date().toLocaleString('zh-CN', { hour12: false }); setLastSync(value); localStorage.setItem(SYNC_KEY, JSON.stringify(value)); };
+  const handleImported = ({ records }) => { setTransactions((current) => { const seen = new Set(current.map((tx) => `${tx.source}:${tx.transactionId || `${tx.date}:${tx.merchant}:${tx.amount}`}`)); const next = [...current]; records.forEach((tx) => { const key = `${tx.source}:${tx.transactionId || `${tx.date}:${tx.merchant}:${tx.amount}`}`; if (!seen.has(key)) { seen.add(key); next.push(tx); } }); return next.sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`)); }); updateSync(); setActiveTab('transactions'); };
   const go = (tab) => setActiveTab(tab);
-
-  return (
-    <div className="app-shell">
-      <aside className="side-rail">
-        <div className="brand-lockup">
-          <div className="brand-mark"><Sparkles size={17} strokeWidth={2.5} /></div>
-          <div>
-            <div className="brand-name">账流</div>
-            <div className="brand-subtitle">PERSONAL LEDGER</div>
-          </div>
-        </div>
-        <div className="rail-section-label">工作台</div>
-        <nav className="rail-nav">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button key={id} className={`rail-link ${activeTab === id ? 'active' : ''}`} onClick={() => go(id)}>
-              <Icon size={18} />
-              <span>{label}</span>
-              {id === 'transactions' && <span className="rail-count">6</span>}
-            </button>
-          ))}
-        </nav>
-        <div className="rail-bottom">
-          <div className="sync-rail-card">
-            <div className="sync-card-top"><span className="live-dot" /> 同步正常</div>
-            <div className="sync-card-time">上次更新 2 分钟前</div>
-            <button className="quiet-button" onClick={() => setActiveTab('settings')}><RefreshCw size={14} /> 检查连接</button>
-          </div>
-          <div className="profile-row">
-            <div className="avatar">林</div>
-            <div className="profile-copy"><strong>林先生</strong><span>本机账本</span></div>
-            <MoreHorizontal size={17} className="muted-icon" />
-          </div>
-        </div>
-      </aside>
-
-      <main className="main-content">
-        <header className="topbar">
-          <div className="topbar-title">
-            <span className="mobile-brand-mark"><Sparkles size={14} /></span>
-            <div>
-              <div className="eyebrow">个人资金看板 / 2026年08月</div>
-              <h1>{navItems.find((item) => item.id === activeTab)?.label}</h1>
-            </div>
-          </div>
-          <div className="topbar-actions">
-            <div className="sync-pill"><span className="live-dot" /> <span>自动同步中</span></div>
-            <button className="icon-button" title="通知"><Bell size={18} /></button>
-            <button className="avatar small">林</button>
-          </div>
-        </header>
-
-        {activeTab === 'dashboard' && <Dashboard onSelect={setSelectedTx} onNavigate={go} />}
-        {activeTab === 'transactions' && (
-          <TransactionsPage
-            transactions={filteredTransactions}
-            query={query}
-            setQuery={setQuery}
-            sourceFilter={sourceFilter}
-            setSourceFilter={setSourceFilter}
-            onSelect={setSelectedTx}
-          />
-        )}
-        {activeTab === 'imports' && <ImportsPage onOpenImport={() => setShowImport(true)} />}
-        {activeTab === 'rules' && <RulesPage />}
-        {activeTab === 'settings' && (
-          <SettingsPage
-            syncEnabled={syncEnabled}
-            setSyncEnabled={setSyncEnabled}
-            notificationEnabled={notificationEnabled}
-            setNotificationEnabled={setNotificationEnabled}
-          />
-        )}
-      </main>
-
-      <nav className="bottom-nav">
-        {navItems.map(({ id, label, icon: Icon }) => (
-          <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => go(id)}>
-            <Icon size={19} />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-
-      {selectedTx && <TransactionDrawer transaction={selectedTx} onClose={() => setSelectedTx(null)} />}
-      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
-    </div>
-  );
+  return <div className="app-shell"><aside className="side-rail"><div className="brand-lockup"><div className="brand-mark"><Sparkles size={17} strokeWidth={2.5} /></div><div><div className="brand-name">账流</div><div className="brand-subtitle">PERSONAL LEDGER</div></div></div><div className="rail-section-label">工作台</div><nav className="rail-nav">{navItems.map(({ id, label, icon: Icon }) => <button key={id} className={`rail-link ${activeTab === id ? 'active' : ''}`} onClick={() => go(id)}><Icon size={18} /><span>{label}</span>{id === 'transactions' && <span className="rail-count">{transactions.length}</span>}</button>)}</nav><div className="rail-bottom"><div className="sync-rail-card"><div className="sync-card-top"><span className="live-dot" /> {syncEnabled ? '本地同步正常' : '本地同步已暂停'}</div><div className="sync-card-time">{lastSync}</div><button className="quiet-button" onClick={() => setActiveTab('settings')}><RefreshCw size={14} /> 检查连接</button></div><div className="profile-row"><div className="avatar">林</div><div className="profile-copy"><strong>林先生</strong><span>本机账本</span></div><MoreHorizontal size={17} className="muted-icon" /></div></div></aside><main className="main-content"><header className="topbar"><div className="topbar-title"><span className="mobile-brand-mark"><Sparkles size={14} /></span><div><div className="eyebrow">个人资金看板 / {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit' })}</div><h1>{navItems.find((item) => item.id === activeTab)?.label}</h1></div></div><div className="topbar-actions"><div className="sync-pill"><span className="live-dot" /> <span>{syncEnabled ? '本地账本已同步' : '同步已暂停'}</span></div><button className="icon-button" title="通知"><Bell size={18} /></button><button className="avatar small">林</button></div></header>{activeTab === 'dashboard' && <Dashboard transactions={transactions} totals={totals} onSelect={setSelectedTx} onNavigate={go} />}{activeTab === 'transactions' && <TransactionsPage transactions={filteredTransactions} totalCount={transactions.length} query={query} setQuery={setQuery} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} onSelect={setSelectedTx} />}{activeTab === 'imports' && <ImportsPage transactions={transactions} onOpenImport={() => setShowImport(true)} />}{activeTab === 'rules' && <RulesPage rules={rules} setRules={setRules} />}{activeTab === 'settings' && <SettingsPage syncEnabled={syncEnabled} setSyncEnabled={setSyncEnabled} notificationEnabled={notificationEnabled} setNotificationEnabled={setNotificationEnabled} lastSync={lastSync} onSync={updateSync} />}</main><nav className="bottom-nav">{navItems.map(({ id, label, icon: Icon }) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => go(id)}><Icon size={19} /><span>{label}</span></button>)}</nav>{selectedTx && <TransactionDrawer transaction={selectedTx} onClose={() => setSelectedTx(null)} />}{showImport && <ImportModal rules={rules} onClose={() => setShowImport(false)} onImported={handleImported} />}</div>;
 }
 
-function Dashboard({ onSelect, onNavigate }) {
-  return (
-    <div className="page-content dashboard-page">
-      <div className="dashboard-intro">
-        <div>
-          <p className="section-kicker">月度概览 <span className="green-text">● 数据已更新</span></p>
-          <h2>这个月，花得比上月少 <span className="red-text">12.4%</span></h2>
-        </div>
-        <button className="outline-button" onClick={() => onNavigate('transactions')}><ListFilter size={16} /> 查看全部流水</button>
-      </div>
-
-      <section className="metric-grid">
-        <MetricCard label="本月净支出" value="¥4,286.30" delta="较上月 -12.4%" tone="cyan" icon={<ArrowDownLeft size={17} />} />
-        <MetricCard label="原始支出" value="¥4,872.50" delta="共 38 笔交易" tone="red" icon={<ArrowUpRight size={17} />} />
-        <MetricCard label="已退款" value="¥586.20" delta="6 笔已匹配" tone="green" icon={<RefreshCw size={17} />} />
-        <MetricCard label="待确认" value="3 笔" delta="需要你的判断" tone="yellow" icon={<CircleAlert size={17} />} />
-      </section>
-
-      <section className="dashboard-grid">
-        <div className="panel trend-panel">
-          <PanelHeader title="净支出趋势" meta="近 30 天" action={<button className="select-button">近 30 天 <ChevronDown size={14} /></button>} />
-          <div className="chart-wrap">
-            <div className="chart-y-labels"><span>¥500</span><span>¥300</span><span>¥100</span><span>¥0</span></div>
-            <div className="chart-area">
-              <div className="chart-gridline one" /><div className="chart-gridline two" /><div className="chart-gridline three" /><div className="chart-gridline four" />
-              <svg className="line-chart" viewBox="0 0 620 210" preserveAspectRatio="none" aria-label="净支出趋势图">
-                <defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#5ee0d0" stopOpacity=".28" /><stop offset="100%" stopColor="#5ee0d0" stopOpacity="0" /></linearGradient></defs>
-                <path d="M0 172 C30 168, 42 142, 68 150 S107 178, 135 136 S167 105, 191 134 S219 159, 250 118 S286 94, 310 119 S345 167, 374 118 S411 87, 440 108 S468 148, 495 101 S526 73, 550 89 S584 74, 620 47 L620 210 L0 210 Z" fill="url(#chartFill)" />
-                <path d="M0 172 C30 168, 42 142, 68 150 S107 178, 135 136 S167 105, 191 134 S219 159, 250 118 S286 94, 310 119 S345 167, 374 118 S411 87, 440 108 S468 148, 495 101 S526 73, 550 89 S584 74, 620 47" fill="none" stroke="#5ee0d0" strokeWidth="3" strokeLinecap="round" />
-                <circle cx="620" cy="47" r="5" fill="#0a0e13" stroke="#5ee0d0" strokeWidth="3" />
-              </svg>
-              <div className="chart-x-labels"><span>07/08</span><span>07/15</span><span>07/22</span><span>07/29</span><span>08/06</span></div>
-            </div>
-          </div>
-        </div>
-        <div className="panel category-panel">
-          <PanelHeader title="支出分布" meta="按分类" action={<button className="icon-button small-icon"><MoreHorizontal size={17} /></button>} />
-          <div className="donut-area">
-            <div className="donut"><div className="donut-center"><strong>¥4,286</strong><span>净支出</span></div></div>
-            <div className="legend-list">
-              <LegendItem color="#e87345" label="购物" value="¥1,420" percent="33%" />
-              <LegendItem color="#5ee0d0" label="餐饮" value="¥986" percent="23%" />
-              <LegendItem color="#f2bd67" label="交通" value="¥708" percent="16%" />
-              <LegendItem color="#8c98a8" label="其他" value="¥1,172" percent="28%" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel recent-panel">
-        <PanelHeader title="最近流水" meta="按发生时间排序" action={<button className="text-button" onClick={() => onNavigate('transactions')}>全部流水 <ChevronRight size={15} /></button>} />
-        <div className="transaction-list compact-list">
-          {transactions.slice(0, 4).map((tx) => <TransactionRow key={tx.id} transaction={tx} onSelect={onSelect} />)}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function MetricCard({ label, value, delta, tone, icon }) {
-  return <div className={`metric-card ${tone}`}><div className="metric-top"><span>{label}</span><span className="metric-icon">{icon}</span></div><strong>{value}</strong><div className="metric-delta">{delta}</div></div>;
-}
-
-function PanelHeader({ title, meta, action }) {
-  return <div className="panel-header"><div><h3>{title}</h3>{meta && <span>{meta}</span>}</div>{action}</div>;
-}
-
-function LegendItem({ color, label, value, percent }) {
-  return <div className="legend-item"><span className="legend-label"><i style={{ background: color }} />{label}</span><span><strong>{value}</strong><em>{percent}</em></span></div>;
-}
-
-function TransactionsPage({ transactions: filtered, query, setQuery, sourceFilter, setSourceFilter, onSelect }) {
-  const options = ['全部来源', '支付宝', '微信'];
-  return <div className="page-content">
-    <div className="page-toolbar"><div><p className="section-kicker">流水总览</p><h2>全部交易 <span className="sub-count">38 笔</span></h2></div><button className="primary-button"><Plus size={16} /> 手动记一笔</button></div>
-    <div className="filters-row"><div className="search-input"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索商户、分类或备注" /></div><div className="source-filters">{options.map((option) => <button key={option} className={sourceFilter === option ? 'active' : ''} onClick={() => setSourceFilter(option)}>{option}</button>)}</div><button className="filter-button"><Filter size={16} /> 筛选</button></div>
-    <div className="transaction-table-wrap"><div className="table-heading"><span>交易信息</span><span>来源</span><span>状态</span><span>实际支出</span></div><div className="transaction-list">{filtered.length ? filtered.map((tx) => <TransactionRow key={tx.id} transaction={tx} onSelect={onSelect} detailed />) : <EmptyState text="没有找到匹配的流水" />}</div></div>
-  </div>;
-}
-
-function TransactionRow({ transaction: tx, onSelect, detailed = false }) {
-  return <button className={`transaction-row ${detailed ? 'detailed' : ''}`} onClick={() => onSelect(tx)}>
-    <div className="transaction-main"><div className={`merchant-icon ${tx.accent}`}>{tx.merchant.slice(0, 1)}</div><div className="transaction-copy"><strong>{tx.merchant}</strong><span>{tx.category} · {tx.time}{tx.note ? ` · ${tx.note}` : ''}</span></div></div>
-    {detailed && <div className={`source-badge ${tx.source}`}>{sourceLabel[tx.source]}</div>}
-    {detailed && <div className={`status-badge ${tx.status === '已退款' ? 'refund' : tx.status === '部分退款' ? 'partial' : 'paid'}`}>{tx.status}</div>}
-    <div className="transaction-amount"><strong className={tx.net === 0 ? 'refund-amount' : ''}>{tx.net === 0 ? '已退款' : `-¥${formatMoney(tx.net)}`}</strong>{tx.net !== tx.amount && <span>原 ¥{formatMoney(tx.amount)}</span>}</div><ChevronRight size={15} className="row-chevron" />
-  </button>;
-}
-
-function ImportsPage({ onOpenImport }) {
-  return <div className="page-content">
-    <div className="page-toolbar"><div><p className="section-kicker">历史补录与校对</p><h2>账单导入</h2></div><button className="primary-button" onClick={onOpenImport}><FileUp size={16} /> 导入账单</button></div>
-    <div className="import-hero"><div className="import-icon"><FileUp size={22} /></div><div><h3>把历史账单交给账流</h3><p>支持微信、支付宝导出的 Excel / CSV 文件。导入前会先预览字段并自动识别退款。</p></div><button className="outline-button" onClick={onOpenImport}>选择文件 <ChevronRight size={15} /></button></div>
-    <div className="import-grid"><ImportSourceCard source="微信账单" icon="微" detail="最近导入：今天 14:12" count="1,248" tone="wechat" /><ImportSourceCard source="支付宝账单" icon="支" detail="最近导入：昨天 19:30" count="2,684" tone="alipay" /></div>
-    <section className="panel batch-panel"><PanelHeader title="最近批次" meta="可撤销最近一次导入" action={<button className="text-button">查看全部 <ChevronRight size={15} /></button>} /><div className="batch-row"><div className="file-symbol"><FileUp size={17} /></div><div><strong>alipay_2026-08.xlsx</strong><span>2,684 条记录 · 6 条退款</span></div><span className="batch-status">已完成</span><button className="icon-button"><MoreHorizontal size={17} /></button></div></section>
-  </div>;
-}
-
-function ImportSourceCard({ source, icon, detail, count, tone }) {
-  return <div className="import-source-card"><div className={`source-logo ${tone}`}>{icon}</div><div><strong>{source}</strong><span>{detail}</span></div><div className="import-count"><strong>{count}</strong><span>已入账</span></div><ChevronRight size={16} className="muted-icon" /></div>;
-}
-
-function RulesPage() {
-  return <div className="page-content"><div className="page-toolbar"><div><p className="section-kicker">自动化设置</p><h2>分类规则</h2></div><button className="primary-button"><Plus size={16} /> 新建规则</button></div><div className="rule-summary"><div><span>已启用规则</span><strong>12</strong></div><div><span>本月自动分类</span><strong>94.6%</strong></div><div><span>待确认商户</span><strong className="yellow-text">3</strong></div></div><section className="panel rules-panel"><PanelHeader title="商户分类规则" meta="优先级从上到下" action={<button className="icon-button small-icon"><SlidersHorizontal size={17} /></button>} /><RuleRow keyword="山姆会员" category="购物" hits="本月命中 4 次" /><RuleRow keyword="滴滴" category="交通" hits="本月命中 8 次" /><RuleRow keyword="瑞幸" category="餐饮" hits="本月命中 11 次" /><RuleRow keyword="Apple.com" category="订阅" hits="本月命中 2 次" /></section></div>;
-}
-
-function RuleRow({ keyword, category, hits }) { return <div className="rule-row"><div className="drag-dots">⋮⋮</div><div className="rule-copy"><strong>商户包含 “{keyword}”</strong><span>{hits}</span></div><span className="category-chip">{category}</span><button className="icon-button"><MoreHorizontal size={17} /></button></div>; }
-
-function SettingsPage({ syncEnabled, setSyncEnabled, notificationEnabled, setNotificationEnabled }) {
-  return <div className="page-content"><div className="page-toolbar"><div><p className="section-kicker">连接与隐私</p><h2>设置</h2></div></div><section className="panel settings-panel"><PanelHeader title="数据源连接" meta="只接收必要的交易字段" action={<ShieldCheck size={18} className="green-text" />} /><SettingRow icon={<Mail size={18} />} title="交易邮件同步" detail="iPhone 与 Android 通用 · 上次同步 2 分钟前" enabled={syncEnabled} onChange={setSyncEnabled} /><SettingRow icon={<Bell size={18} />} title="Android 通知监听" detail="读取微信、支付宝的支付与退款通知" enabled={notificationEnabled} onChange={setNotificationEnabled} androidOnly /><SettingRow icon={<Cloud size={18} />} title="云端原文缓存" detail="解析后 24 小时自动清除" enabled={true} locked /></section><section className="panel settings-panel"><PanelHeader title="本地数据" meta="账本主数据保存在本机" /><button className="setting-action"><Inbox size={18} /><span><strong>导出本地账本</strong><small>生成 Excel 文件保存到本机</small></span><ChevronRight size={16} /></button><button className="setting-action"><ShieldCheck size={18} /><span><strong>隐私与权限说明</strong><small>查看数据采集和删除规则</small></span><ChevronRight size={16} /></button></section></div>;
-}
-
-function SettingRow({ icon, title, detail, enabled, onChange, androidOnly, locked }) { return <div className="setting-row"><div className="setting-icon">{icon}</div><div className="setting-copy"><strong>{title}{androidOnly && <em>Android</em>}</strong><span>{detail}</span></div>{locked ? <span className="locked-label">受保护</span> : <button className={`switch ${enabled ? 'on' : ''}`} onClick={() => onChange(!enabled)} aria-label={`切换${title}`}><span /></button>}</div>; }
-
-function TransactionDrawer({ transaction: tx, onClose }) {
-  return <div className="drawer-backdrop" onClick={onClose}><aside className="transaction-drawer" onClick={(event) => event.stopPropagation()}><div className="drawer-header"><div><span className="section-kicker">流水详情</span><h2>{tx.merchant}</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div><div className="drawer-amount"><span>实际计入总账</span><strong className={tx.net === 0 ? 'green-text' : ''}>{tx.net === 0 ? '¥0.00' : `¥${formatMoney(tx.net)}`}</strong>{tx.net !== tx.amount && <em>原支出 ¥{formatMoney(tx.amount)} · 已退 ¥{formatMoney(tx.amount - tx.net)}</em>}</div><div className="detail-status"><span className={`status-badge ${tx.status === '已退款' ? 'refund' : tx.status === '部分退款' ? 'partial' : 'paid'}`}>{tx.status}</span><span className={`source-badge ${tx.source}`}>{sourceLabel[tx.source]}</span></div><div className="detail-list"><DetailItem label="发生时间" value={tx.date + ' ' + tx.time.replace('今天 ', '').replace('昨天 ', '')} /><DetailItem label="分类" value={tx.category} /><DetailItem label="备注" value={tx.note || '未填写'} /><DetailItem label="同步来源" value={tx.source === 'alipay' ? '交易邮件解析' : 'Android 通知监听'} /></div><div className="refund-timeline"><div className="timeline-title"><RefreshCw size={16} /> 退款链路</div><div className="timeline-item"><span className="timeline-dot paid-dot" /><div><strong>支付成功</strong><span>{tx.time} · ¥{formatMoney(tx.amount)}</span></div></div>{tx.net !== tx.amount && <div className="timeline-item"><span className="timeline-dot refund-dot" /><div><strong>{tx.status}</strong><span>自动匹配 · ¥{formatMoney(tx.amount - tx.net)}</span></div></div>}</div><button className="outline-button drawer-action">编辑分类与备注</button></aside></div>;
-}
-
+function Dashboard({ transactions, totals, onSelect, onNavigate }) { const categoryTotals = categories.map((category) => ({ category, value: transactions.filter((tx) => tx.category === category).reduce((sum, tx) => sum + tx.net, 0) })).filter((item) => item.value > 0).sort((a, b) => b.value - a.value); const topCategories = categoryTotals.slice(0, 4); return <div className="page-content dashboard-page"><div className="dashboard-intro"><div><p className="section-kicker">月度概览 <span className="green-text">● 数据已更新</span></p><h2>退款已从总账扣除 <span className="green-text">实时计算</span></h2></div><button className="outline-button" onClick={() => onNavigate('transactions')}><ListFilter size={16} /> 查看全部流水</button></div><section className="metric-grid"><MetricCard label="本月净支出" value={`¥${formatMoney(totals.net)}`} delta={`退款后实际支出 · ${transactions.length} 笔`} tone="cyan" icon={<ArrowDownLeft size={17} />} /><MetricCard label="原始支出" value={`¥${formatMoney(totals.gross)}`} delta={`共 ${transactions.length} 笔交易`} tone="red" icon={<ArrowUpRight size={17} />} /><MetricCard label="已退款" value={`¥${formatMoney(totals.refunded)}`} delta={`${totals.refundCount} 笔已匹配`} tone="green" icon={<RefreshCw size={17} />} /><MetricCard label="待确认" value="0 笔" delta="导入时自动识别" tone="yellow" icon={<CircleAlert size={17} />} /></section><section className="dashboard-grid"><div className="panel trend-panel"><PanelHeader title="净支出趋势" meta="已导入流水" action={<button className="select-button">全部 <ChevronDown size={14} /></button>} /><div className="chart-wrap"><div className="chart-y-labels"><span>¥500</span><span>¥300</span><span>¥100</span><span>¥0</span></div><div className="chart-area"><div className="chart-gridline one" /><div className="chart-gridline two" /><div className="chart-gridline three" /><div className="chart-gridline four" /><svg className="line-chart" viewBox="0 0 620 210" preserveAspectRatio="none" aria-label="净支出趋势图"><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#5ee0d0" stopOpacity=".28" /><stop offset="100%" stopColor="#5ee0d0" stopOpacity="0" /></linearGradient></defs><path d="M0 172 C30 168, 42 142, 68 150 S107 178, 135 136 S167 105, 191 134 S219 159, 250 118 S286 94, 310 119 S345 167, 374 118 S411 87, 440 108 S468 148, 495 101 S526 73, 550 89 S584 74, 620 47 L620 210 L0 210 Z" fill="url(#chartFill)" /><path d="M0 172 C30 168, 42 142, 68 150 S107 178, 135 136 S167 105, 191 134 S219 159, 250 118 S286 94, 310 119 S345 167, 374 118 S411 87, 440 108 S468 148, 495 101 S526 73, 550 89 S584 74, 620 47" fill="none" stroke="#5ee0d0" strokeWidth="3" strokeLinecap="round" /><circle cx="620" cy="47" r="5" fill="#0a0e13" stroke="#5ee0d0" strokeWidth="3" /></svg><div className="chart-x-labels"><span>近30天</span><span>导入</span><span>退款</span><span>净额</span></div></div></div></div><div className="panel category-panel"><PanelHeader title="支出分布" meta="按分类" action={<button className="icon-button small-icon"><MoreHorizontal size={17} /></button>} /><div className="donut-area"><div className="donut"><div className="donut-center"><strong>¥{formatMoney(totals.net)}</strong><span>净支出</span></div></div><div className="legend-list">{topCategories.length ? topCategories.map((item, index) => <LegendItem key={item.category} color={['#e87345', '#5ee0d0', '#f2bd67', '#8c98a8'][index]} label={item.category} value={`¥${formatMoney(item.value)}`} percent={`${Math.round(item.value / Math.max(totals.net, 1) * 100)}%`} />) : <LegendItem color="#8c98a8" label="暂无数据" value="¥0.00" percent="0%" />}</div></div></div></section><section className="panel recent-panel"><PanelHeader title="最近流水" meta="按发生时间排序" action={<button className="text-button" onClick={() => onNavigate('transactions')}>全部流水 <ChevronRight size={15} /></button>} /><div className="transaction-list compact-list">{transactions.slice(0, 4).map((tx) => <TransactionRow key={tx.id} transaction={tx} onSelect={onSelect} />)}</div></section></div>; }
+function MetricCard({ label, value, delta, tone, icon }) { return <div className={`metric-card ${tone}`}><div className="metric-top"><span>{label}</span><span className="metric-icon">{icon}</span></div><strong>{value}</strong><div className="metric-delta">{delta}</div></div>; }
+function PanelHeader({ title, meta, action }) { return <div className="panel-header"><div><h3>{title}</h3>{meta && <span>{meta}</span>}</div>{action}</div>; }
+function LegendItem({ color, label, value, percent }) { return <div className="legend-item"><span className="legend-label"><i style={{ background: color }} />{label}</span><span><strong>{value}</strong><em>{percent}</em></span></div>; }
+function TransactionsPage({ transactions: filtered, totalCount, query, setQuery, sourceFilter, setSourceFilter, onSelect }) { const options = ['全部来源', '支付宝', '微信']; return <div className="page-content"><div className="page-toolbar"><div><p className="section-kicker">流水总览</p><h2>全部交易 <span className="sub-count">{totalCount} 笔</span></h2></div><button className="primary-button" onClick={() => alert('请使用导入账单或后续手动录入功能')}><Plus size={16} /> 手动记一笔</button></div><div className="filters-row"><div className="search-input"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索商户、分类或备注" /></div><div className="source-filters">{options.map((option) => <button key={option} className={sourceFilter === option ? 'active' : ''} onClick={() => setSourceFilter(option)}>{option}</button>)}</div><button className="filter-button"><Filter size={16} /> 筛选</button></div><div className="transaction-table-wrap"><div className="table-heading"><span>交易信息</span><span>来源</span><span>状态</span><span>实际支出</span></div><div className="transaction-list">{filtered.length ? filtered.map((tx) => <TransactionRow key={tx.id} transaction={tx} onSelect={onSelect} detailed />) : <EmptyState text="没有找到匹配的流水" />}</div></div></div>; }
+function TransactionRow({ transaction: tx, onSelect, detailed = false }) { return <button className={`transaction-row ${detailed ? 'detailed' : ''}`} onClick={() => onSelect(tx)}><div className="transaction-main"><div className={`merchant-icon ${tx.accent}`}>{tx.merchant.slice(0, 1)}</div><div className="transaction-copy"><strong>{tx.merchant}</strong><span>{tx.category} · {tx.time}{tx.note ? ` · ${tx.note}` : ''}</span></div></div>{detailed && <div className={`source-badge ${tx.source}`}>{sourceLabel[tx.source]}</div>}{detailed && <div className={`status-badge ${tx.status === '已退款' ? 'refund' : tx.status === '部分退款' ? 'partial' : 'paid'}`}>{tx.status}</div>}<div className="transaction-amount"><strong className={tx.net === 0 ? 'refund-amount' : ''}>{tx.net === 0 ? '已退款' : `-¥${formatMoney(tx.net)}`}</strong>{tx.net !== tx.amount && <span>原 ¥{formatMoney(tx.amount)} · 退 ¥{formatMoney(tx.refundAmount)}</span>}</div><ChevronRight size={15} className="row-chevron" /></button>; }
+function ImportsPage({ transactions, onOpenImport }) { const alipay = transactions.filter((tx) => tx.source === 'alipay').length; const wechat = transactions.filter((tx) => tx.source === 'wechat').length; return <div className="page-content"><div className="page-toolbar"><div><p className="section-kicker">历史补录与校对</p><h2>账单导入</h2></div><button className="primary-button" onClick={onOpenImport}><FileUp size={16} /> 导入账单</button></div><div className="import-hero"><div className="import-icon"><FileUp size={22} /></div><div><h3>把历史账单交给账流</h3><p>支持微信、支付宝导出的 CSV 文件。导入前会先预览字段并自动识别退款；Excel 请先另存为 CSV。</p></div><button className="outline-button" onClick={onOpenImport}>选择文件 <ChevronRight size={15} /></button></div><div className="import-grid"><ImportSourceCard source="微信账单" icon="微" detail="本机已保存" count={wechat.toLocaleString()} tone="wechat" /><ImportSourceCard source="支付宝账单" icon="支" detail="本机已保存" count={alipay.toLocaleString()} tone="alipay" /></div><section className="panel batch-panel"><PanelHeader title="最近批次" meta="数据仅保存在本机" action={<span className="text-button">退款自动匹配</span>} /><div className="batch-row"><div className="file-symbol"><FileUp size={17} /></div><div><strong>本机账本</strong><span>{transactions.length} 条记录 · 已按来源去重</span></div><span className="batch-status">可继续导入</span><button className="icon-button" onClick={onOpenImport}><MoreHorizontal size={17} /></button></div></section></div>; }
+function ImportSourceCard({ source, icon, detail, count, tone }) { return <div className="import-source-card"><div className={`source-logo ${tone}`}>{icon}</div><div><strong>{source}</strong><span>{detail}</span></div><div className="import-count"><strong>{count}</strong><span>已入账</span></div><ChevronRight size={16} className="muted-icon" /></div>; }
+function RulesPage({ rules, setRules }) { const [keyword, setKeyword] = useState(''); const [category, setCategory] = useState('其他'); const addRule = () => { if (!keyword.trim()) return; setRules((current) => [...current, { id: `rule-${Date.now()}`, keyword: keyword.trim(), category, enabled: true }]); setKeyword(''); }; return <div className="page-content"><div className="page-toolbar"><div><p className="section-kicker">自动化设置</p><h2>分类规则</h2></div><button className="primary-button" onClick={addRule}><Plus size={16} /> 新建规则</button></div><div className="rule-summary"><div><span>已启用规则</span><strong>{rules.filter((rule) => rule.enabled).length}</strong></div><div><span>本月自动分类</span><strong>{rules.length ? '已启用' : '0%'}</strong></div><div><span>待确认商户</span><strong className="yellow-text">0</strong></div></div><div className="panel rules-panel"><PanelHeader title="商户分类规则" meta="导入时按关键词匹配，优先级从上到下" action={<SlidersHorizontal size={17} className="muted-icon" />} /><div className="rule-create"><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="商户关键词，如：星巴克" /><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{item}</option>)}</select><button className="outline-button" onClick={addRule}>添加</button></div>{rules.map((rule) => <RuleRow key={rule.id} rule={rule} onToggle={() => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, enabled: !item.enabled } : item))} onDelete={() => setRules((current) => current.filter((item) => item.id !== rule.id))} />)}</div></div>; }
+function RuleRow({ rule, onToggle, onDelete }) { return <div className="rule-row"><div className="drag-dots">⋮⋮</div><div className="rule-copy"><strong>商户包含 “{rule.keyword}”</strong><span>{rule.enabled ? '已启用，导入时自动分类' : '已停用'}</span></div><span className="category-chip">{rule.category}</span><button className="icon-button" onClick={onToggle} title="切换规则">{rule.enabled ? '开' : '关'}</button><button className="icon-button" onClick={onDelete} title="删除规则"><MoreHorizontal size={17} /></button></div>; }
+function SettingsPage({ syncEnabled, setSyncEnabled, notificationEnabled, setNotificationEnabled, lastSync, onSync }) { return <div className="page-content"><div className="page-toolbar"><div><p className="section-kicker">连接与隐私</p><h2>设置</h2></div><button className="outline-button" onClick={onSync}><RefreshCw size={16} /> 立即同步</button></div><section className="panel settings-panel"><PanelHeader title="数据源连接" meta="只接收必要的交易字段" action={<ShieldCheck size={18} className="green-text" />} /><SettingRow icon={<Mail size={18} />} title="交易邮件同步" detail={`iPhone 与 Android 通用 · ${lastSync}`} enabled={syncEnabled} onChange={setSyncEnabled} locked /><SettingRow icon={<Bell size={18} />} title="Android 通知监听" detail="读取微信、支付宝的支付与退款通知；需安装原生 Android 版本" enabled={notificationEnabled} onChange={setNotificationEnabled} androidOnly /><SettingRow icon={<Cloud size={18} />} title="云端原文缓存" detail="当前未连接云端，账单原文不会上传" enabled={false} locked /></section><section className="panel settings-panel"><PanelHeader title="本地数据" meta="账本主数据保存在本机" /><button className="setting-action" onClick={() => downloadJson()}><Inbox size={18} /><span><strong>导出本地账本</strong><small>生成 JSON 文件保存到本机</small></span><ChevronRight size={16} /></button><button className="setting-action"><ShieldCheck size={18} /><span><strong>隐私与权限说明</strong><small>微信/支付宝真实自动同步需单独授权，当前版本不上传隐私数据</small></span><ChevronRight size={16} /></button></section></div>; }
+function SettingRow({ icon, title, detail, enabled, onChange, androidOnly, locked }) { return <div className="setting-row"><div className="setting-icon">{icon}</div><div className="setting-copy"><strong>{title}{androidOnly && <em>Android</em>}</strong><span>{detail}</span></div>{locked ? <span className="locked-label">待授权</span> : <button className={`switch ${enabled ? 'on' : ''}`} onClick={() => onChange(!enabled)} aria-label={`切换${title}`}><span /></button>}</div>; }
+function downloadJson() { const blob = new Blob([localStorage.getItem(STORAGE_KEY) || '[]'], { type: 'application/json;charset=utf-8' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `账流-本地账本-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(link.href); }
+function TransactionDrawer({ transaction: tx, onClose }) { return <div className="drawer-backdrop" onClick={onClose}><aside className="transaction-drawer" onClick={(event) => event.stopPropagation()}><div className="drawer-header"><div><span className="section-kicker">流水详情</span><h2>{tx.merchant}</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div><div className="drawer-amount"><span>实际计入总账</span><strong className={tx.net === 0 ? 'green-text' : ''}>{`¥${formatMoney(tx.net)}`}</strong>{tx.refundAmount > 0 && <em>原支出 ¥{formatMoney(tx.amount)} · 已退 ¥{formatMoney(tx.refundAmount)}</em>}</div><div className="detail-status"><span className={`status-badge ${tx.status === '已退款' ? 'refund' : tx.status === '部分退款' ? 'partial' : 'paid'}`}>{tx.status}</span><span className={`source-badge ${tx.source}`}>{sourceLabel[tx.source]}</span></div><div className="detail-list"><DetailItem label="发生时间" value={`${tx.date} ${tx.time.split(' ').pop()}`} /><DetailItem label="分类" value={tx.category} /><DetailItem label="备注" value={tx.note || '未填写'} /><DetailItem label="交易单号" value={tx.transactionId || '导入记录未提供'} /><DetailItem label="同步来源" value="本地 CSV 导入" /></div><div className="refund-timeline"><div className="timeline-title"><RefreshCw size={16} /> 退款链路</div><div className="timeline-item"><span className="timeline-dot paid-dot" /><div><strong>支付成功</strong><span>{tx.time} · ¥{formatMoney(tx.amount)}</span></div></div>{tx.refundAmount > 0 && <div className="timeline-item"><span className="timeline-dot refund-dot" /><div><strong>{tx.status}</strong><span>自动匹配 · ¥{formatMoney(tx.refundAmount)}</span></div></div>}</div></aside></div>; }
 function DetailItem({ label, value }) { return <div className="detail-item"><span>{label}</span><strong>{value}</strong></div>; }
-
-function ImportModal({ onClose }) {
-  const [stage, setStage] = useState('select');
-  return <div className="modal-backdrop" onClick={onClose}><div className="import-modal" onClick={(event) => event.stopPropagation()}>{stage === 'select' ? <><div className="modal-header"><div><span className="section-kicker">导入历史流水</span><h2>选择账单文件</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div><div className="drop-zone" onClick={() => setStage('preview')}><div className="drop-icon"><FileUp size={24} /></div><strong>点击选择或拖入文件</strong><span>支持 .xlsx、.xls、.csv，单个文件最大 20MB</span></div><div className="modal-note"><CircleAlert size={15} /> 导入前会先预览字段，不会立即改变总账。</div></> : <><div className="modal-header"><div><span className="section-kicker">第 1 步 / 第 2 步</span><h2>确认字段映射</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div><div className="file-preview"><div className="file-symbol"><FileUp size={18} /></div><div><strong>wechat_账单_2026.xlsx</strong><span>1,248 行 · 检测到 14 条退款</span></div><span className="green-text">可导入</span></div><div className="mapping-list"><MappingRow from="交易时间" to="发生时间" /><MappingRow from="交易对方" to="商户名称" /><MappingRow from="金额" to="支付金额" /><MappingRow from="交易状态" to="状态" /></div><button className="primary-button full-button" onClick={() => setStage('done')}><Sparkles size={16} /> 开始导入</button></>}{stage === 'done' && <div className="modal-success"><div className="success-check">✓</div><h2>导入完成</h2><p>1,234 条已入账，14 条退款已匹配。</p><button className="primary-button" onClick={onClose}>返回导入中心</button></div>}</div></div>;
-}
-
+function ImportModal({ onClose, onImported, rules }) { const [stage, setStage] = useState('select'); const [file, setFile] = useState(null); const [preview, setPreview] = useState(null); const [error, setError] = useState(''); const handleFile = async (event) => { const selected = event.target.files?.[0] || event.dataTransfer?.files?.[0]; if (!selected) return; setFile(selected); setError(''); if (!/\.csv$/i.test(selected.name)) { setError('当前版本先支持 CSV。请在微信/支付宝导出后另存为 CSV 再导入。'); setPreview(null); return; } const text = await selected.text(); const rows = parseCsv(text); if (!rows.length) { setError('没有识别到表头或有效数据行。'); setPreview(null); return; } const source = inferSource(selected.name, rows); const result = normalizeRows(rows, source, rules); setPreview({ ...result, rowCount: rows.length }); setStage('preview'); }; const commit = () => { if (!preview?.records?.length) return; onImported(preview); setStage('done'); }; return <div className="modal-backdrop" onClick={onClose}><div className="import-modal" onClick={(event) => event.stopPropagation()}>{stage === 'select' && <><div className="modal-header"><div><span className="section-kicker">导入历史流水</span><h2>选择账单文件</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div><label className="drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={handleFile}><input type="file" accept=".csv,text/csv" onChange={handleFile} hidden /><div className="drop-icon"><FileUp size={24} /></div><strong>点击选择或拖入 CSV 文件</strong><span>支持微信、支付宝导出的 CSV；Excel 请先另存为 CSV</span></label><div className="modal-note"><CircleAlert size={15} /> 导入前会先预览字段，不会立即改变总账。</div>{error && <div className="modal-note red-text">{error}</div>}</>}{stage === 'preview' && preview && <><div className="modal-header"><div><span className="section-kicker">第 1 步 / 第 2 步</span><h2>确认字段映射</h2></div><button className="icon-button" onClick={onClose}><X size={18} /></button></div><div className="file-preview"><div className="file-symbol"><FileUp size={18} /></div><div><strong>{file?.name}</strong><span>{preview.rowCount} 行 · 检测到 {preview.refundCount} 条退款 · 识别为{sourceLabel[preview.source]}</span></div><span className="green-text">可导入</span></div><div className="mapping-list"><MappingRow from="交易时间 / 支付时间" to="发生时间" /><MappingRow from="交易对方 / 商品说明" to="商户名称" /><MappingRow from="金额 / 交易金额" to="支付金额" /><MappingRow from="交易状态 / 收支" to="退款与支出" /></div><button className="primary-button full-button" onClick={commit}><Sparkles size={16} /> 导入 {preview.records.length} 条有效支出</button></>}{stage === 'done' && <div className="modal-success"><div className="success-check">✓</div><h2>导入完成</h2><p>已保存 {preview?.records?.length || 0} 条，退款金额已从总账扣除。</p><button className="primary-button" onClick={onClose}>返回导入中心</button></div>}</div></div>; }
 function MappingRow({ from, to }) { return <div className="mapping-row"><span>{from}</span><ChevronRight size={14} /><strong>{to}</strong><span className="mapping-ok">已识别</span></div>; }
 function EmptyState({ text }) { return <div className="empty-state"><Search size={22} /><span>{text}</span></div>; }
 
 createRoot(document.getElementById('root')).render(<App />);
+
+
+
